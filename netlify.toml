@@ -1,0 +1,6 @@
+[Settings]
+  ID = "b2f4df4b-3d5e-48d3-b85b-efef435908e6"
+
+[Build]
+  Publish = "site"
+  Functions = "functions"
