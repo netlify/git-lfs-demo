@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -11,16 +12,16 @@ import (
 )
 
 func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
-	parts := strings.Split(request.Path, "/")
-
-	switch parts[0] {
-	case "":
+	switch request.Path {
+	case "/.netlify/functions/lfs":
 		return events.APIGatewayProxyResponse{
 			StatusCode: 200,
 			Body:       "Netlify LFS server",
 		}, nil
-	case "objects":
-		return objectsCommand(ctx, request, parts[1:])
+	case "/.netlify/functions/lfs/objects/batch":
+		return objectsCommand(ctx, request)
+	case "/.netlify/functions/lfs/verify":
+		return verifyCommand(ctx, request)
 	}
 
 	return events.APIGatewayProxyResponse{
@@ -28,12 +29,12 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 	}, nil
 }
 
-func objectsCommand(ctx context.Context, request events.APIGatewayProxyRequest, parts []string) (events.APIGatewayProxyResponse, error) {
+func objectsCommand(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 	if request.HTTPMethod == "GET" {
 		return signDownloads(ctx, request)
 	}
 
-	if request.HTTPMethod == "POST" && len(parts) == 0 {
+	if request.HTTPMethod == "POST" {
 		return signUploads(ctx, request)
 	}
 
@@ -56,10 +57,17 @@ func signUploads(ctx context.Context, request events.APIGatewayProxyRequest) (ev
 		return events.APIGatewayProxyResponse{
 			StatusCode: 200,
 			Body:       "{}",
+			Headers: map[string]string{
+				"Content-Type": "application/vnd.git-lfs+json",
+			},
 		}, nil
 	}
 
-	return signObjectUploads(ctx, b.Transfers[0], b.Objects)
+	var transfer string
+	if len(b.Transfers) > 0 {
+		transfer = b.Transfers[0]
+	}
+	return signObjectUploads(ctx, transfer, b.Objects)
 }
 
 func signDownloads(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
@@ -76,10 +84,22 @@ func signDownloads(ctx context.Context, request events.APIGatewayProxyRequest) (
 		return events.APIGatewayProxyResponse{
 			StatusCode: 200,
 			Body:       "{}",
+			Headers: map[string]string{
+				"Content-Type": "application/vnd.git-lfs+json",
+			},
 		}, nil
 	}
 
 	return signObjectDownloads(ctx, b.Transfers[0], b.Objects)
+}
+
+func verifyCommand(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
+	var o objectRequest
+	if err := json.NewDecoder(strings.NewReader(request.Body)).Decode(&o); err != nil {
+		return newResponseError(ctx, 422, err)
+	}
+
+	return verifyObject(ctx, o)
 }
 
 func main() {

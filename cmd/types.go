@@ -30,19 +30,19 @@ type ref struct {
 
 type action struct {
 	Href      string            `json:"href"`
-	Header    map[string]string `json:"header"`
+	Header    map[string]string `json:"header,omitempty"`
 	ExpiresIn float64           `json:"expires_in,omitempty"`
 	ExpiresAt string            `json:"expires_at,omitempty"`
 }
 
 type objectRequest struct {
 	Oid  string `json:"oid"`
-	Size uint64 `json:"size"`
+	Size int64  `json:"size"`
 }
 
 type objectResponse struct {
 	Oid           string            `json:"oid"`
-	Size          uint64            `json:"size"`
+	Size          int64             `json:"size"`
 	Authenticated bool              `json:"authenticated"`
 	Actions       map[string]action `json:"actions,omitempty"`
 	Error         *responseError    `json:"error,omitempty"`
@@ -50,7 +50,7 @@ type objectResponse struct {
 
 type batchRequest struct {
 	Operation string          `json:"operation"`
-	Transfers []string        `json:"transfers"`
+	Transfers []string        `json:"transfers,omitempty"`
 	Ref       *ref            `json:"ref,omitemtpy"`
 	Objects   []objectRequest `json:"objects"`
 }
@@ -89,5 +89,8 @@ func newResponseError(ctx context.Context, status int, err error) (events.APIGat
 	return events.APIGatewayProxyResponse{
 		StatusCode: status,
 		Body:       string(b),
+		Headers: map[string]string{
+			"Content-Type": "application/vnd.git-lfs+json",
+		},
 	}, nil
 }
